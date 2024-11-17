@@ -1,10 +1,10 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
 import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import MinMaxScaler, LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 
 # Title and Description
 st.title("MLBB Hero Role Prediction and Analysis App")
@@ -12,6 +12,9 @@ st.write("This app provides preprocessing, outlier detection, visualizations, an
 
 # Upload the dataset
 uploaded_file = st.file_uploader("Upload a CSV file", type="csv")
+
+# Initialize a variable to keep track of whether preprocessing was done
+data_cleaned = None
 
 if uploaded_file is not None:
     # Load dataset
@@ -21,9 +24,13 @@ if uploaded_file is not None:
     st.subheader("Full Dataset")
     st.dataframe(data)
 
-    # Display columns to help debug if 'role' column is missing
-    st.write("Columns in the dataset:")
-    st.write(data.columns)  # Display the columns to check if 'role' is present
+    # Define numeric columns for preprocessing
+    features = [
+        'defense_overall', 'offense_overall', 'skill_effect_overall',
+        'difficulty_overall', 'movement_spd', 'magic_defense', 'mana',
+        'hp_regen', 'physical_atk', 'physical_defense', 'hp',
+        'attack_speed', 'mana_regen', 'win_rate', 'pick_rate', 'ban_rate'
+    ]
 
     # Hero selection for visualization
     st.subheader("Select a Hero to Visualize Attributes")
@@ -32,18 +39,10 @@ if uploaded_file is not None:
     # Display hero attributes before preprocessing
     if hero_name:
         hero_data_original = data[data['hero_name'] == hero_name].iloc[0]
-        hero_attributes_original = hero_data_original[
-            ['defense_overall', 'offense_overall', 'skill_effect_overall',
-             'difficulty_overall', 'movement_spd', 'magic_defense', 'mana',
-             'hp_regen', 'physical_atk', 'physical_defense', 'hp',
-             'attack_speed', 'mana_regen', 'win_rate', 'pick_rate', 'ban_rate']
-        ]
+        hero_attributes_original = hero_data_original[features]
 
         st.subheader(f"Attributes of {hero_name} (Before Preprocessing)")
         st.table(hero_attributes_original.reset_index().rename(columns={'index': 'Attribute', 0: 'Value'}))
-
-    # Initialize data_cleaned variable
-    data_cleaned = data.copy()  # Initialize this variable to avoid errors
 
     # Button to run preprocessing
     if st.button("Run Outlier Detection and Preprocessing"):
@@ -59,12 +58,6 @@ if uploaded_file is not None:
             return data
 
         # Apply the function to handle outliers
-        features = [
-            'defense_overall', 'offense_overall', 'skill_effect_overall',
-            'difficulty_overall', 'movement_spd', 'magic_defense', 'mana',
-            'hp_regen', 'physical_atk', 'physical_defense', 'hp',
-            'attack_speed', 'mana_regen', 'win_rate', 'pick_rate', 'ban_rate'
-        ]
         data_cleaned = handle_outliers(data.copy(), features)
 
         # Normalize numeric features for consistency
@@ -85,77 +78,57 @@ if uploaded_file is not None:
             st.subheader(f"Attributes of {hero_name} (After Preprocessing)")
             st.table(hero_attributes_cleaned.reset_index().rename(columns={'index': 'Attribute', 0: 'Normalized Value'}))
 
-        # Visualization section: Graphs after preprocessing
-        st.subheader("Visualizations After Preprocessing")
+        # Visualizations (Histogram)
+        st.subheader("Visualizations (Histogram)")
 
-        # Bar chart for feature comparison
-        st.write("### Feature Comparison (Bar Chart)")
-        hero_features = features[:6]  # Select a subset of features to display
-        hero_values = hero_data_cleaned[hero_features]
-        fig, ax = plt.subplots(figsize=(10, 6))
-        ax.bar(hero_features, hero_values, color='skyblue')
-        plt.xticks(rotation=45)
-        plt.xlabel("Attributes")
-        plt.ylabel("Normalized Value")
-        plt.title(f"Attributes Comparison for {hero_name}")
+        # Histogram for 'win_rate'
+        st.write("### Histogram of Win Rate")
+        fig, ax = plt.subplots(figsize=(12, 6))
+        sns.histplot(data_cleaned['win_rate'], kde=True, ax=ax, color='blue', bins=20)
         st.pyplot(fig)
 
-        # Histogram for distribution of features (For overall dataset)
-        st.write("### Distribution of Features (Histograms)")
-        for feature in features[:6]:  # Show histograms for the first 6 features
-            fig, ax = plt.subplots(figsize=(10, 6))
-            sns.histplot(data_cleaned[feature], bins=20, kde=True, ax=ax)
-            ax.set_title(f"Distribution of {feature.replace('_', ' ').capitalize()}")
-            ax.set_xlabel("Value")
-            ax.set_ylabel("Frequency")
-            st.pyplot(fig)
-
-        # Scatter plots for relationships between features (example: 'physical_atk' vs 'hp')
-        st.write("### Scatter Plot for Relationship Between Features")
-        fig, ax = plt.subplots(figsize=(10, 6))
-        sns.scatterplot(data=data_cleaned, x='physical_atk', y='hp', hue='role', palette='viridis', ax=ax)
-        ax.set_title("Physical Attack vs HP (Color-coded by Role)")
-        ax.set_xlabel("Physical Attack")
-        ax.set_ylabel("HP")
+        # Histogram for 'pick_rate'
+        st.write("### Histogram of Pick Rate")
+        fig, ax = plt.subplots(figsize=(12, 6))
+        sns.histplot(data_cleaned['pick_rate'], kde=True, ax=ax, color='green', bins=20)
         st.pyplot(fig)
 
-        # Correlation heatmap
-        st.write("### Correlation Heatmap")
-        heatmap_fig, ax = plt.subplots(figsize=(10, 8))
-        sns.heatmap(data_cleaned[features].corr(), annot=True, cmap="coolwarm", fmt=".2f", ax=ax)
-        st.pyplot(heatmap_fig)
+        # Histogram for 'ban_rate'
+        st.write("### Histogram of Ban Rate")
+        fig, ax = plt.subplots(figsize=(12, 6))
+        sns.histplot(data_cleaned['ban_rate'], kde=True, ax=ax, color='red', bins=20)
+        st.pyplot(fig)
 
     # Check if 'role' exists in the dataset for prediction
     if 'role' not in data.columns:
-        st.error("The 'role' column is missing from the dataset. Please ensure the dataset includes this column.")
+        st.error("Column 'role' not found in the dataset. Please ensure the file has a 'role' column.")
+        st.write("Kolom yang ada dalam dataset:", data.columns)
     else:
-        # Encode the target 'role' column if preprocessing was done
-        if 'role_encoded' not in data_cleaned.columns:
-            st.warning("Preprocessing has not been performed. Please click 'Run Outlier Detection and Preprocessing' first.")
-        else:
-            # Encode the 'role' column into numeric values for prediction
+        # Proceed only if preprocessing was done and data_cleaned is not None
+        if data_cleaned is not None:
+            # Encode the target 'role' column
             label_encoder = LabelEncoder()
             data_cleaned['role_encoded'] = label_encoder.fit_transform(data_cleaned['role'])
 
-            # Define features and target for the prediction model
+            # Define features and target
             model_features = [
                 'defense_overall', 'offense_overall', 'skill_effect_overall', 'difficulty_overall',
                 'movement_spd', 'magic_defense', 'mana', 'hp_regen'
             ]
-
+            
             X = data_cleaned[model_features]
             y = data_cleaned['role_encoded']
 
-            # Split the data into training and test sets
+            # Split the data
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-            # Initialize and train the decision tree model
+            # Initialize and train the model
             model = DecisionTreeClassifier(random_state=42)
             model.fit(X_train, y_train)
 
             # Prediction based on custom inputs
             st.subheader("Predict Role Based on Custom Attributes")
-
+            
             custom_input = {}
             for feature in model_features:
                 custom_input[feature] = st.number_input(f"{feature.replace('_', ' ').capitalize()}", min_value=0.0, value=0.5)
@@ -166,8 +139,7 @@ if uploaded_file is not None:
             # Predict role
             predicted_role_encoded = model.predict(input_data)[0]
             predicted_role = label_encoder.inverse_transform([predicted_role_encoded])[0]
-
+            
             st.write(f"Predicted Role: **{predicted_role}**")
-
 else:
     st.write("Please upload a CSV file to proceed.")
