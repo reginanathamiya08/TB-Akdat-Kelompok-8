@@ -13,16 +13,19 @@ st.write("This app provides preprocessing, outlier detection, visualizations, an
 # Upload the dataset
 uploaded_file = st.file_uploader("Upload a CSV file", type="csv")
 
-# Initialize a variable to keep track of whether preprocessing was done
-data_cleaned = None
+# Initialize session state for storing the cleaned data if it doesn't exist yet
+if 'data_cleaned' not in st.session_state:
+    st.session_state['data_cleaned'] = None
+    st.session_state['original_data'] = None
 
+# Load dataset if uploaded
 if uploaded_file is not None:
     # Load dataset
-    data = pd.read_csv(uploaded_file)
+    st.session_state['original_data'] = pd.read_csv(uploaded_file)
 
     # Display the full dataset as a table
     st.subheader("Full Dataset")
-    st.dataframe(data)
+    st.dataframe(st.session_state['original_data'])
 
     # Define numeric columns for preprocessing
     features = [
@@ -33,11 +36,11 @@ if uploaded_file is not None:
     ]
 
     # Hero selection for visualization
-    hero_name = st.selectbox("Choose a Hero", data['hero_name'].unique())
+    hero_name = st.selectbox("Choose a Hero", st.session_state['original_data']['hero_name'].unique())
 
     # Display hero attributes before preprocessing
     if hero_name:
-        hero_data_original = data[data['hero_name'] == hero_name].iloc[0]
+        hero_data_original = st.session_state['original_data'][st.session_state['original_data']['hero_name'] == hero_name].iloc[0]
         hero_attributes_original = hero_data_original[features]
 
         st.subheader(f"Attributes of {hero_name} (Before Preprocessing)")
@@ -57,21 +60,21 @@ if uploaded_file is not None:
             return data
 
         # Apply the function to handle outliers
-        data_cleaned = handle_outliers(data.copy(), features)
+        st.session_state['data_cleaned'] = handle_outliers(st.session_state['original_data'].copy(), features)
 
         # Normalize numeric features for consistency
         scaler = MinMaxScaler()
-        data_cleaned[features] = scaler.fit_transform(data_cleaned[features])
+        st.session_state['data_cleaned'][features] = scaler.fit_transform(st.session_state['data_cleaned'][features])
 
         st.success("Outlier detection and preprocessing completed!")
 
         # Display cleaned dataset
         st.subheader("Dataset After Preprocessing")
-        st.dataframe(data_cleaned)
+        st.dataframe(st.session_state['data_cleaned'])
 
         # Display hero attributes after preprocessing
         if hero_name:
-            hero_data_cleaned = data_cleaned[data_cleaned['hero_name'] == hero_name].iloc[0]
+            hero_data_cleaned = st.session_state['data_cleaned'][st.session_state['data_cleaned']['hero_name'] == hero_name].iloc[0]
             hero_attributes_cleaned = hero_data_cleaned[features]
 
             st.subheader(f"Attributes of {hero_name} (After Preprocessing)")
@@ -91,9 +94,8 @@ if uploaded_file is not None:
     # Add New Hero Data
     st.subheader("Add New Hero Data")
 
-    # Input fields for new hero data
+    # Input fields for new hero data (without hero role)
     new_hero_name = st.text_input("Hero Name")
-    new_hero_role = st.selectbox("Hero Role", ['Fighter', 'Mage', 'Marksman', 'Tank', 'Support', 'Assassin'])
 
     new_hero_data = {}
     for feature in features:
@@ -101,44 +103,30 @@ if uploaded_file is not None:
         new_hero_data[feature] = st.number_input(f"{feature.replace('_', ' ').capitalize()}", min_value=0.0, value=0.5, step=0.01, key=f"{feature}_new")
 
     # Initialize data_cleaned as the original data if it has not been cleaned yet
-    if data_cleaned is None:
-        data_cleaned = data.copy()
+    if st.session_state['data_cleaned'] is None:
+        st.session_state['data_cleaned'] = st.session_state['original_data'].copy()
 
     if st.button("Add Hero"):
         if new_hero_name:
-            # Append the new hero data to the existing dataset
-            new_hero_data['hero_name'] = new_hero_name
-            new_hero_data['role'] = new_hero_role
-            new_hero_df = pd.DataFrame([new_hero_data])
+            # Predict the role of the new hero based on the input features
 
-            # Append to the original data
-            data_cleaned = pd.concat([data_cleaned, new_hero_df], ignore_index=True)
-
-            st.success(f"Hero {new_hero_name} added successfully!")
-
-            # Display updated dataset
-            st.subheader("Updated Dataset")
-            st.dataframe(data_cleaned)
-
-    # Check if 'role' exists in the dataset for prediction
-    if 'role' not in data.columns:
-        st.error("Column 'role' not found in the dataset. Please ensure the file has a 'role' column.")
-        st.write("Kolom yang ada dalam dataset:", data.columns)
-    else:
-        # Proceed only if preprocessing was done and data_cleaned is not None
-        if data_cleaned is not None:
-            # Encode the target 'role' column
-            label_encoder = LabelEncoder()
-            data_cleaned['role_encoded'] = label_encoder.fit_transform(data_cleaned['role'])
-
-            # Define features and target
+            # Define the model features (same as before)
             model_features = [
                 'defense_overall', 'offense_overall', 'skill_effect_overall', 'difficulty_overall',
                 'movement_spd', 'magic_defense', 'mana', 'hp_regen'
             ]
             
-            X = data_cleaned[model_features]
-            y = data_cleaned['role_encoded']
+            # Prepare the new hero input for prediction
+            new_hero_input = {feature: new_hero_data[feature] for feature in model_features}
+            input_data = pd.DataFrame([new_hero_input])
+
+            # Encode the target 'role' column
+            label_encoder = LabelEncoder()
+            st.session_state['data_cleaned']['role_encoded'] = label_encoder.fit_transform(st.session_state['data_cleaned']['role'])
+
+            # Define features and target for training
+            X = st.session_state['data_cleaned'][model_features]
+            y = st.session_state['data_cleaned']['role_encoded']
 
             # Split the data
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
@@ -147,22 +135,23 @@ if uploaded_file is not None:
             model = DecisionTreeClassifier(random_state=42)
             model.fit(X_train, y_train)
 
-            # Prediction based on custom inputs
-            st.subheader("Predict Role Based on Custom Attributes")
-
-            # Input for each attribute
-            custom_input = {}
-            for feature in model_features:
-                # Append the feature name with a unique identifier to ensure uniqueness
-                custom_input[feature] = st.number_input(f"{feature.replace('_', ' ').capitalize()}", min_value=0.0, value=0.5, step=0.01, key=f"{feature}_predict")
-
-            # Create a DataFrame for the input values
-            input_data = pd.DataFrame([custom_input])
-
-            # Predict role
+            # Predict role for the new hero
             predicted_role_encoded = model.predict(input_data)[0]
             predicted_role = label_encoder.inverse_transform([predicted_role_encoded])[0]
-            
-            st.write(f"Predicted Role: **{predicted_role}**")
+
+            # Add the new hero data to the dataset
+            new_hero_data['hero_name'] = new_hero_name
+            new_hero_data['role'] = predicted_role
+            new_hero_df = pd.DataFrame([new_hero_data])
+
+            # Append to the original data
+            st.session_state['data_cleaned'] = pd.concat([st.session_state['data_cleaned'], new_hero_df], ignore_index=True)
+
+            st.success(f"Hero {new_hero_name} added successfully with predicted role: {predicted_role}!")
+
+            # Display updated dataset
+            st.subheader("Updated Dataset")
+            st.dataframe(st.session_state['data_cleaned'])
+
 else:
     st.write("Please upload a CSV file to proceed.")
