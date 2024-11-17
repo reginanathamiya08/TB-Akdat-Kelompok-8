@@ -33,7 +33,6 @@ if uploaded_file is not None:
     ]
 
     # Hero selection for visualization
-    st.subheader("Select a Hero to Visualize Attributes")
     hero_name = st.selectbox("Choose a Hero", data['hero_name'].unique())
 
     # Display hero attributes before preprocessing
@@ -78,26 +77,16 @@ if uploaded_file is not None:
             st.subheader(f"Attributes of {hero_name} (After Preprocessing)")
             st.table(hero_attributes_cleaned.reset_index().rename(columns={'index': 'Attribute', 0: 'Normalized Value'}))
 
-        # Visualizations (Histogram)
-        st.subheader("Visualizations (Histogram)")
-
-        # Histogram for 'win_rate'
-        st.write("### Histogram of Win Rate")
-        fig, ax = plt.subplots(figsize=(12, 6))
-        sns.histplot(data_cleaned['win_rate'], kde=True, ax=ax, color='blue', bins=20)
-        st.pyplot(fig)
-
-        # Histogram for 'pick_rate'
-        st.write("### Histogram of Pick Rate")
-        fig, ax = plt.subplots(figsize=(12, 6))
-        sns.histplot(data_cleaned['pick_rate'], kde=True, ax=ax, color='green', bins=20)
-        st.pyplot(fig)
-
-        # Histogram for 'ban_rate'
-        st.write("### Histogram of Ban Rate")
-        fig, ax = plt.subplots(figsize=(12, 6))
-        sns.histplot(data_cleaned['ban_rate'], kde=True, ax=ax, color='red', bins=20)
-        st.pyplot(fig)
+            # Visualization of hero attributes (bar plot)
+            fig, ax = plt.subplots(figsize=(10, 6))
+            hero_attributes_cleaned.plot(kind='bar', ax=ax, color='skyblue')
+            for p in ax.patches:
+                ax.annotate(f'{p.get_height():.2f}', (p.get_x() + p.get_width() / 2., p.get_height()),
+                            xytext=(0, 5), textcoords='offset points', ha='center', va='bottom', fontsize=10)
+            ax.set_title(f"Attributes of {hero_name} (After Preprocessing)")
+            ax.set_ylabel('Normalized Value')
+            ax.set_xlabel('Attributes')
+            st.pyplot(fig)
 
     # Check if 'role' exists in the dataset for prediction
     if 'role' not in data.columns:
