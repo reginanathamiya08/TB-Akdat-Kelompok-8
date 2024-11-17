@@ -88,6 +88,38 @@ if uploaded_file is not None:
             ax.set_xlabel('Attributes')
             st.pyplot(fig)
 
+    # Add New Hero Data
+    st.subheader("Add New Hero Data")
+
+    # Input fields for new hero data
+    new_hero_name = st.text_input("Hero Name")
+    new_hero_role = st.selectbox("Hero Role", ['Fighter', 'Mage', 'Marksman', 'Tank', 'Support', 'Assassin'])
+
+    new_hero_data = {}
+    for feature in features:
+        # Append the feature name with a unique identifier to ensure uniqueness
+        new_hero_data[feature] = st.number_input(f"{feature.replace('_', ' ').capitalize()}", min_value=0.0, value=0.5, step=0.01, key=f"{feature}_new")
+
+    # Initialize data_cleaned as the original data if it has not been cleaned yet
+    if data_cleaned is None:
+        data_cleaned = data.copy()
+
+    if st.button("Add Hero"):
+        if new_hero_name:
+            # Append the new hero data to the existing dataset
+            new_hero_data['hero_name'] = new_hero_name
+            new_hero_data['role'] = new_hero_role
+            new_hero_df = pd.DataFrame([new_hero_data])
+
+            # Append to the original data
+            data_cleaned = pd.concat([data_cleaned, new_hero_df], ignore_index=True)
+
+            st.success(f"Hero {new_hero_name} added successfully!")
+
+            # Display updated dataset
+            st.subheader("Updated Dataset")
+            st.dataframe(data_cleaned)
+
     # Check if 'role' exists in the dataset for prediction
     if 'role' not in data.columns:
         st.error("Column 'role' not found in the dataset. Please ensure the file has a 'role' column.")
@@ -117,10 +149,12 @@ if uploaded_file is not None:
 
             # Prediction based on custom inputs
             st.subheader("Predict Role Based on Custom Attributes")
-            
+
+            # Input for each attribute
             custom_input = {}
             for feature in model_features:
-                custom_input[feature] = st.number_input(f"{feature.replace('_', ' ').capitalize()}", min_value=0.0, value=0.5)
+                # Append the feature name with a unique identifier to ensure uniqueness
+                custom_input[feature] = st.number_input(f"{feature.replace('_', ' ').capitalize()}", min_value=0.0, value=0.5, step=0.01, key=f"{feature}_predict")
 
             # Create a DataFrame for the input values
             input_data = pd.DataFrame([custom_input])
