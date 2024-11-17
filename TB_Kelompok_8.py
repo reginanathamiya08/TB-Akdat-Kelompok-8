@@ -97,6 +97,9 @@ if uploaded_file is not None:
     # Input fields for new hero data (without hero role)
     new_hero_name = st.text_input("Hero Name")
 
+    # Input for the release year of the hero
+    new_hero_release_year = st.number_input("Release Year", min_value=2000, max_value=2024, value=2023, step=1)
+
     new_hero_data = {}
     for feature in features:
         # Append the feature name with a unique identifier to ensure uniqueness
@@ -139,18 +142,20 @@ if uploaded_file is not None:
             predicted_role_encoded = model.predict(input_data)[0]
             predicted_role = label_encoder.inverse_transform([predicted_role_encoded])[0]
 
-            # Add the new hero data to the dataset
+            # Add the new hero data to the dataset, including role_encoded and release_year
             new_hero_data['hero_name'] = new_hero_name
             new_hero_data['role'] = predicted_role
+            new_hero_data['role_encoded'] = predicted_role_encoded  # Add the encoded role
+            new_hero_data['release_year'] = new_hero_release_year  # Add the release year
             new_hero_df = pd.DataFrame([new_hero_data])
 
             # Append to the original data
             st.session_state['data_cleaned'] = pd.concat([st.session_state['data_cleaned'], new_hero_df], ignore_index=True)
 
-            st.success(f"Hero {new_hero_name} added successfully with predicted role: {predicted_role}!")
+            st.success(f"Hero {new_hero_name} added successfully with predicted role: {predicted_role}, role_encoded: {predicted_role_encoded}, and release year: {new_hero_release_year}!")
 
-            # Display updated dataset
-            st.subheader("Updated Dataset")
+            # Display updated dataset with the new 'role_encoded' and 'release_year' columns
+            st.subheader("Updated Dataset (Including 'role_encoded' and 'release_year')")
             st.dataframe(st.session_state['data_cleaned'])
 
 else:
