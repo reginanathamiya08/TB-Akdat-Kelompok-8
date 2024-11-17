@@ -17,8 +17,14 @@ uploaded_file = st.file_uploader("Upload a CSV file", type="csv")
 if 'data_cleaned' not in st.session_state:
     st.session_state['data_cleaned'] = None
     st.session_state['original_data'] = None
-    st.session_state['model'] = None
-    st.session_state['label_encoder'] = None
+    st.session_state['model'] = None  # Store model in session state
+    st.session_state['label_encoder'] = None  # Store label encoder for role encoding
+
+# Define the model features that will be used for prediction (the 8 features)
+model_features = [
+    'defense_overall', 'offense_overall', 'skill_effect_overall', 'difficulty_overall',
+    'movement_spd', 'magic_defense', 'mana', 'hp_regen'
+]
 
 # Load dataset if uploaded
 if uploaded_file is not None:
@@ -29,10 +35,12 @@ if uploaded_file is not None:
     st.subheader("Full Dataset")
     st.dataframe(st.session_state['original_data'])
 
-    # Define numeric columns for preprocessing (only 8 features now)
+    # Define numeric columns for preprocessing
     features = [
-        'defense_overall', 'offense_overall', 'skill_effect_overall', 'difficulty_overall',
-        'movement_spd', 'magic_defense', 'mana', 'hp_regen'
+        'defense_overall', 'offense_overall', 'skill_effect_overall',
+        'difficulty_overall', 'movement_spd', 'magic_defense', 'mana',
+        'hp_regen', 'physical_atk', 'physical_defense', 'hp',
+        'attack_speed', 'mana_regen', 'win_rate', 'pick_rate', 'ban_rate'
     ]
 
     # Hero selection for visualization
@@ -48,16 +56,6 @@ if uploaded_file is not None:
 
     # Button to run preprocessing
     if st.button("Run Outlier Detection and Preprocessing"):
-        # Handle missing values by filling with the mean (or another strategy)
-        def handle_missing_values(data, features):
-            for feature in features:
-                if data[feature].isnull().sum() > 0:
-                    data[feature] = data[feature].fillna(data[feature].mean())  # Fill missing values with the mean
-            return data
-
-        # Handle missing values
-        st.session_state['original_data'] = handle_missing_values(st.session_state['original_data'].copy(), features)
-
         # Function to detect and handle outliers using IQR
         def handle_outliers(data, features):
             for feature in features:
@@ -121,9 +119,7 @@ if uploaded_file is not None:
 
     if st.button("Add Hero"):
         if new_hero_name:
-            # Prepare the new hero input for prediction
-            model_features = features  # Only the 8 features used for prediction
-
+            # Prepare the new hero input for prediction using model_features (8 features)
             new_hero_input = {feature: new_hero_data[feature] for feature in model_features}
             input_data = pd.DataFrame([new_hero_input])
 
@@ -142,7 +138,7 @@ if uploaded_file is not None:
             model = DecisionTreeClassifier(random_state=42)
             model.fit(X_train, y_train)
 
-            # Store the trained model and label encoder in session state for future predictions
+            # Store the trained model and label encoder in session state
             st.session_state['model'] = model
             st.session_state['label_encoder'] = label_encoder
 
@@ -169,6 +165,7 @@ if uploaded_file is not None:
     # Predict Role Based on Custom Attributes
     st.subheader("Predict Role Based on Custom Attributes")
     
+    # Collect the input values
     defense_overall = st.number_input("Defense Overall", min_value=0, max_value=10, value=5)
     offense_overall = st.number_input("Offense Overall", min_value=0, max_value=10, value=5)
     skill_effect_overall = st.number_input("Skill Effect Overall", min_value=0, max_value=10, value=5)
@@ -178,16 +175,17 @@ if uploaded_file is not None:
     mana = st.number_input("Mana", min_value=0, max_value=1000, value=400)
     hp_regen = st.number_input("HP Regen", min_value=0, max_value=100, value=30)
 
-    # Create input data for role prediction
-    input_data = pd.DataFrame([[defense_overall, offense_overall, skill_effect_overall, difficulty_overall,
-                                movement_spd, magic_defense, mana, hp_regen]], columns=features)
+    # Make sure the model is trained before making predictions
+    if st.session_state['model'] is not None:
+        # Create a DataFrame for the input values
+        input_data = pd.DataFrame([[defense_overall, offense_overall, skill_effect_overall, difficulty_overall,
+                                    movement_spd, magic_defense, mana, hp_regen]], columns=model_features)
 
-    if st.button("Predict Role"):
-        # Check if the model has been trained
-        if st.session_state['model'] is not None:
-            # Predict role using the trained model
-            predicted_role_encoded = st.session_state['model'].predict(input_data)[0]
-            predicted_role = st.session_state['label_encoder'].inverse_transform([predicted_role_encoded])[0]
-            st.success(f"The predicted role for the given attributes is: {predicted_role}")
-        else:
-            st.warning("Please upload data and run the model training first.")
+        # Predict role
+        predicted_role_encoded = st.session_state['model'].predict(input_data)[0]
+        predicted_role = st.session_state['label_encoder'].inverse_transform([predicted_role_encoded])[0]
+        
+        st.write(f"Predicted Role: **{predicted_role}**")
+
+else:
+    st.write("Please upload a CSV file to proceed.")
